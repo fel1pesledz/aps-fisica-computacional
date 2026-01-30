@@ -3,58 +3,60 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from scipy.stats import zscore
 
-# Função de ajuste
-def curva_amortecida(t, cte, amplitude, b, omega, phi):
-    return cte + amplitude * np.exp(-b * t) * np.cos(omega * t + phi)
+def oscilacao_amortecida(tempo, constante, amplitude, amortecimento, omega, fase):
+    return constante + amplitude * np.exp(-amortecimento * tempo) * np.cos(omega * tempo + fase)
 
-# Carregando os dados
-TEMPOS_FILE = "./output/tempos.txt"
-ESPACOS_FILE = "./output/espacos.txt"
+ARQUIVO_TEMPOS = "./output/tempos.txt"
+ARQUIVO_ESPACOS = "./output/espacos.txt"
+
 try:
-    x_data = np.loadtxt(TEMPOS_FILE, dtype=float)
-    y_data = np.loadtxt(ESPACOS_FILE, dtype=float)
-except Exception as e:
-    print(f"Erro ao carregar os dados: {e}")
+    tempos = np.loadtxt(ARQUIVO_TEMPOS, dtype=float)
+    posicoes = np.loadtxt(ARQUIVO_ESPACOS, dtype=float)
+except Exception as erro:
+    print(f"Erro ao carregar os dados: {erro}")
     exit()
 
-# Filtragem de outliers usando Z-score
-z_scores = np.abs(zscore(y_data))
-mask = z_scores < 2  # Mantém apenas os pontos dentro de 2 desvios padrões
-x_filtered = x_data[mask]
-y_filtered = y_data[mask]
+# Remoção de outliers via Z-score
+z_scores = np.abs(zscore(posicoes))
+mascara = z_scores < 2
 
-# Palpite inicial para os parâmetros do ajuste
-guess = [26, 18, 0.01, 2 * np.pi, 0]
+tempos_filtrados = tempos[mascara]
+posicoes_filtradas = posicoes[mascara]
 
-# Definindo limites para os parâmetros
-bounds = ([0, 0, 0, 0, -np.pi], [50, 50, 1, 10 * np.pi, np.pi])
+palpite_inicial = [26, 18, 0.01, 2 * np.pi, 0]
 
-# Ajustando a curva
+limites = (
+    [0, 0, 0, 0, -np.pi],
+    [50, 50, 1, 10 * np.pi, np.pi]
+)
+
 try:
-    popt, pcov = curve_fit(curva_amortecida, x_filtered, y_filtered, p0=guess, bounds=bounds)
-except Exception as e:
-    print(f"Erro no ajuste da curva: {e}")
+    parametros_otimizados, matriz_covariancia = curve_fit(
+        oscilacao_amortecida,
+        tempos_filtrados,
+        posicoes_filtradas,
+        p0=palpite_inicial,
+        bounds=limites
+    )
+except Exception as erro:
+    print(f"Erro no ajuste da curva: {erro}")
     exit()
 
-# Extraindo os parâmetros ajustados
-cte, amplitude, b, omega, phi = popt
+constante, amplitude, amortecimento, omega, fase = parametros_otimizados
 
-w0 = np.sqrt(omega**2 + b**2)  # Freqüência angular natural
-m = 0.250  # Massa do pêndulo em kg
-q = w0 / (2 * b)  # Fator de qualidade (Q)
+frequencia_natural = np.sqrt(omega**2 + amortecimento**2)
+massa = 0.250
+fator_qualidade = frequencia_natural / (2 * amortecimento)
 
-# Salvando o fator de qualidade
-with open("./output/fqualidade.txt", "w") as f:
-    f.write(f"{q}")
+with open("./output/fqualidade.txt", "w") as arquivo:
+    arquivo.write(f"{fator_qualidade}")
 
-# Gerando os dados ajustados (expansão do intervalo)
-x_fit = np.linspace(min(x_data) - 1, max(x_data) + 1, 1000)
-y_fit = curva_amortecida(x_fit, *popt)
+tempo_ajuste = np.linspace(min(tempos) - 1, max(tempos) + 1, 1000)
+posicao_ajuste = oscilacao_amortecida(tempo_ajuste, *parametros_otimizados)
 
-# Plotando somente a curva ajustada e os pontos
 plt.figure(figsize=(8, 5))
-plt.scatter(x_filtered, y_filtered, color="blue", label="Dados filtrados")
-plt.plot(x_fit, y_fit, color="red", label="Curva ajustada")
+plt.scatter(tempos_filtrados, posicoes_filtradas, label="Dados filtrados")
+plt.plot(tempo_ajuste, posicao_ajuste, label="Curva ajustada")
 plt.xlabel("Tempo (s)")
 plt.ylabel("Posição (cm)")
 plt.title("Ajuste de Oscilação Amortecida")

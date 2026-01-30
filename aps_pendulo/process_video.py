@@ -1,83 +1,69 @@
-from functools import partial
 import cv2 as cv
 import numpy as np
 import os
 
-# Relação pixel para cm (ajuste com base nos experimentos)
-PIXEL_TO_CM = 12 / 261  # cm/pixel
-VIDEO_FILE = "video.mp4"  # Nome do vídeo
-OUTPUT_DIR = "./output/"
-FRAME_RATE = 1 / 30  # 30 FPS
+PIXEL_PARA_CM = 12 / 261
+ARQUIVO_VIDEO = "video.mp4"
+DIRETORIO_SAIDA = "./output/"
+PASSO_TEMPO = 1 / 30  # 30 FPS
 
-# Cria a pasta de saída, se não existir
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(DIRETORIO_SAIDA, exist_ok=True)
 
-# Função para binarizar um frame
-def binarize(image):
-    gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)  # Converte para escala de cinza
-    blurred = cv.GaussianBlur(gray, (5, 5), 0)  # Aplica blur para remover ruído
-    _, binary = cv.threshold(blurred, 100, 255, cv.THRESH_BINARY_INV)  # Binarização
-    return binary
+def binarizar(imagem):
+    cinza = cv.cvtColor(imagem, cv.COLOR_BGR2GRAY)
+    desfocada = cv.GaussianBlur(cinza, (5, 5), 0)
+    _, binaria = cv.threshold(desfocada, 100, 255, cv.THRESH_BINARY_INV)
+    return binaria
 
-def centro_de_massa(image):
-    # Calcula os momentos da imagem binarizada
-    moments = cv.moments(image)
+def centro_de_massa(imagem):
+    momentos = cv.moments(imagem)
 
-    # Evita divisão por zero (caso a imagem esteja completamente preta ou branca)
-    if moments["m00"] == 0:
-        raise ValueError("Centro de massa não encontrado - momentos inválidos.")
+    if momentos["m00"] == 0:
+        raise ValueError("Centro de massa não encontrado")
 
-    # Calcula a posição horizontal (cX) do centro de massa
-    cX = moments["m10"] / moments["m00"]
+    return momentos["m10"] / momentos["m00"]
 
-    return cX
-
-# Função para processar um frame e extrair informações de tempo e posição
-def process_frame(frame, sec, time_list, position_list):
+def processar_frame(frame, tempo, lista_tempos, lista_posicoes):
     try:
-        binary_frame = binarize(frame)
-        cX = centro_de_massa(binary_frame)
-        time_list.append(f"{sec}\n")
-        position_list.append(f"{cX * PIXEL_TO_CM}\n")
-    except ValueError as e:
-        print(f"Erro ao processar frame no tempo {sec}s: {e}")
+        frame_binario = binarizar(frame)
+        centro_x = centro_de_massa(frame_binario)
+        lista_tempos.append(f"{tempo}\n")
+        lista_posicoes.append(f"{centro_x * PIXEL_PARA_CM}\n")
+    except ValueError as erro:
+        print(f"Erro no tempo {tempo}s: {erro}")
 
-# Função principal para processar o vídeo inteiro
 def main():
-    vidcap = cv.VideoCapture(VIDEO_FILE)  # Abre o vídeo
-    if not vidcap.isOpened():
-        print(f"Erro: Não foi possível abrir o vídeo {VIDEO_FILE}")
+    captura = cv.VideoCapture(ARQUIVO_VIDEO)
+
+    if not captura.isOpened():
+        print(f"Erro ao abrir o vídeo {ARQUIVO_VIDEO}")
         return
 
-    sec = 0  # Inicializa o tempo
-    frame_contador = 0  # Contador de frames
-    frame_intervalo = int(vidcap.get(cv.CAP_PROP_FPS) * FRAME_RATE)  # Intervalo entre frames a serem processados
+    tempo = 0
+    contador_frames = 0
+    intervalo_frames = int(captura.get(cv.CAP_PROP_FPS) * PASSO_TEMPO)
 
-    time_list = []  # Lista para armazenar os tempos
-    position_list = []  # Lista para armazenar as posições
+    tempos = []
+    posicoes = []
 
-    ret = True  # Variável de controle do laço
+    sucesso = True
 
-    while ret:  # Continua enquanto o frame for lido corretamente
-        # Tenta ler o próximo frame
-        ret, frame = vidcap.read()
+    while sucesso:
+        sucesso, frame = captura.read()
 
-        # Processa o frame a cada intervalo de tempo definido
-        if ret and frame_contador % frame_intervalo == 0:
-            process_frame(frame, sec, time_list, position_list)
-            sec = round(sec + FRAME_RATE, 2)  # Atualiza o tempo
+        if sucesso and contador_frames % intervalo_frames == 0:
+            processar_frame(frame, tempo, tempos, posicoes)
+            tempo = round(tempo + PASSO_TEMPO, 2)
 
-        frame_contador += 1  # Incrementa o contador de frames
+        contador_frames += 1
 
-    vidcap.release()  # Libera o vídeo
+    captura.release()
 
-    # Salva os dados de tempos e posições em arquivos
-    with open(os.path.join(OUTPUT_DIR, "tempos.txt"), "w") as f_time:
-        f_time.writelines(time_list)
+    with open(os.path.join(DIRETORIO_SAIDA, "tempos.txt"), "w") as arquivo_tempo:
+        arquivo_tempo.writelines(tempos)
 
-    with open(os.path.join(OUTPUT_DIR, "espacos.txt"), "w") as f_space:
-        f_space.writelines(position_list)
-
+    with open(os.path.join(DIRETORIO_SAIDA, "espacos.txt"), "w") as arquivo_espaco:
+        arquivo_espaco.writelines(posicoes)
 
 if __name__ == "__main__":
     main()
