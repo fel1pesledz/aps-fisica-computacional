@@ -3,96 +3,106 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.patches import Rectangle
 
-def massa_mola_simulador():
-    # Entrada do usuário
-    n = int(input("Número de massas (e molas): "))
-    m = np.array([float(input(f"Massa {i+1} (kg): ")) for i in range(n)])
-    k = float(input("Constante das molas (N/m): "))
-    x0 = np.array([float(input(f"Posição inicial da massa {i+1} (m): ")) for i in range(n)])
-    v0 = np.array([float(input(f"Velocidade inicial da massa {i+1} (m/s): ")) for i in range(n)])
-    dt = 0.01  # Passo de tempo para integração
+def simulador_massa_mola():
+    numero_massas = int(input("Número de massas (e molas): "))
+    massas = np.array([float(input(f"Massa {i+1} (kg): ")) for i in range(numero_massas)])
+    constante_mola = float(input("Constante das molas (N/m): "))
+    posicoes_iniciais = np.array([float(input(f"Posição inicial da massa {i+1} (m): ")) for i in range(numero_massas)])
+    velocidades_iniciais = np.array([float(input(f"Velocidade inicial da massa {i+1} (m/s): ")) for i in range(numero_massas)])
+    delta_t = 0.01
 
-    # Paredes
     parede_esquerda = float(input("Posição da parede esquerda (m): "))
     parede_direita = float(input("Posição da parede direita (m): "))
 
-    # Estado inicial
-    posicoes = x0.copy()  # Renomeei para evitar conflito com `x` global
-    velocidades = v0.copy()  # Renomeei para evitar conflito com `v` global
+    posicoes = posicoes_iniciais.copy()
+    velocidades = velocidades_iniciais.copy()
 
-    # Calcular comprimentos de repouso iniciais
-    d = np.zeros(n + 1)
-    d[0] = abs(posicoes[0] - parede_esquerda)  # Distância parede esquerda e 1ª massa
-    for i in range(1, n):
-        d[i] = abs(posicoes[i] - posicoes[i - 1])  # Distâncias entre massas adjacentes
-    d[-1] = abs(parede_direita - posicoes[-1])  # Distância última massa e parede direita
+    comprimentos_repouso = np.zeros(numero_massas + 1)
+    comprimentos_repouso[0] = abs(posicoes[0] - parede_esquerda)
 
-    # Função para calcular forças
+    for i in range(1, numero_massas):
+        comprimentos_repouso[i] = abs(posicoes[i] - posicoes[i - 1])
+
+    comprimentos_repouso[-1] = abs(parede_direita - posicoes[-1])
+
     def calcular_forcas(pos):
-        f = np.zeros(n)
-        for i in range(n):
-            if i == 0:  # Primeira massa (ligada à parede esquerda)
-                f[i] = -k * (pos[i] - parede_esquerda - d[0]) + k * (pos[i + 1] - pos[i] - d[1])
-            elif i == n - 1:  # Última massa (ligada à parede direita)
-                f[i] = -k * (pos[i] - pos[i - 1] - d[i]) - k * (pos[i] - parede_direita + d[-1])
-            else:  # Massas intermediárias
-                f[i] = -k * (pos[i] - pos[i - 1] - d[i]) + k * (pos[i + 1] - pos[i] - d[i + 1])
-        return f
+        forcas = np.zeros(numero_massas)
+        for i in range(numero_massas):
+            if i == 0:
+                forcas[i] = (
+                    -constante_mola * (pos[i] - parede_esquerda - comprimentos_repouso[0]) +
+                    constante_mola * (pos[i + 1] - pos[i] - comprimentos_repouso[1])
+                )
+            elif i == numero_massas - 1:
+                forcas[i] = (
+                    -constante_mola * (pos[i] - pos[i - 1] - comprimentos_repouso[i]) -
+                    constante_mola * (pos[i] - parede_direita + comprimentos_repouso[-1])
+                )
+            else:
+                forcas[i] = (
+                    -constante_mola * (pos[i] - pos[i - 1] - comprimentos_repouso[i]) +
+                    constante_mola * (pos[i + 1] - pos[i] - comprimentos_repouso[i + 1])
+                )
+        return forcas
 
-    # Função para restringir a posição e velocidade das massas
     def aplicar_limites(pos, vel):
-        if pos[0] < parede_esquerda:  # Massa esquerda ultrapassa limite
+        if pos[0] < parede_esquerda:
             pos[0] = parede_esquerda
             vel[0] = 0
-        if pos[-1] > parede_direita:  # Massa direita ultrapassa limite
+        if pos[-1] > parede_direita:
             pos[-1] = parede_direita
             vel[-1] = 0
 
-    # Integração Verlet
     def atualizar_dinamica():
         nonlocal posicoes, velocidades
-        f = calcular_forcas(posicoes)
-        a = f / m
-        posicoes += velocidades * dt + 0.5 * a * dt**2  # Atualiza posições
-        aplicar_limites(posicoes, velocidades)  # Aplica restrições de parede
-        f_new = calcular_forcas(posicoes)  # Recalcula forças com novas posições
-        a_new = f_new / m
-        velocidades += 0.5 * (a + a_new) * dt  # Atualiza velocidades
+        forcas = calcular_forcas(posicoes)
+        aceleracoes = forcas / massas
+        posicoes += velocidades * delta_t + 0.5 * aceleracoes * delta_t**2
+        aplicar_limites(posicoes, velocidades)
+        novas_forcas = calcular_forcas(posicoes)
+        novas_aceleracoes = novas_forcas / massas
+        velocidades += 0.5 * (aceleracoes + novas_aceleracoes) * delta_t
 
-    # Configuração da animação
-    fig, ax = plt.subplots()
-    ax.set_xlim(parede_esquerda - 2, parede_direita + 2)
-    ax.set_ylim(-2, 2)
+    figura, eixo = plt.subplots()
+    eixo.set_xlim(parede_esquerda - 2, parede_direita + 2)
+    eixo.set_ylim(-2, 2)
 
-    # Criar os "blocos" para as massas
-    blocos = [Rectangle((posicoes[i] - 0.2, -0.25), 0.4, 0.5, color='red') for i in range(n)]
-    for retangulo in blocos:
-        ax.add_patch(retangulo)
+    blocos = [
+        Rectangle((posicoes[i] - 0.2, -0.25), 0.4, 0.5, color='red')
+        for i in range(numero_massas)
+    ]
 
-    springs, = ax.plot([], [], '-', lw=2, color='blue')  # Linha para as molas
-    ax.plot([parede_esquerda, parede_esquerda], [-0.5, 0.5], 'black', lw=2)
-    ax.plot([parede_direita, parede_direita], [-0.5, 0.5], 'black', lw=2)
+    for bloco in blocos:
+        eixo.add_patch(bloco)
 
-    def init():
-        springs.set_data([], [])
-        return blocos + [springs]
+    molas, = eixo.plot([], [], '-', lw=2, color='blue')
+    eixo.plot([parede_esquerda, parede_esquerda], [-0.5, 0.5], 'black', lw=2)
+    eixo.plot([parede_direita, parede_direita], [-0.5, 0.5], 'black', lw=2)
 
-    def update(_):
+    def inicializar():
+        molas.set_data([], [])
+        return blocos + [molas]
+
+    def atualizar(_):
         atualizar_dinamica()
-        x_positions = np.hstack(([parede_esquerda], posicoes, [parede_direita]))
-        y_positions = np.zeros(n + 2)
+        posicoes_x = np.hstack(([parede_esquerda], posicoes, [parede_direita]))
+        posicoes_y = np.zeros(numero_massas + 2)
 
-        # Atualizar posições dos blocos
-        for i, retangulo in enumerate(blocos):
-            retangulo.set_xy((posicoes[i] - 0.2, -0.25))
+        for i, bloco in enumerate(blocos):
+            bloco.set_xy((posicoes[i] - 0.2, -0.25))
 
-        # Atualizar mola
-        springs.set_data(x_positions, y_positions)
-        return blocos + [springs]
+        molas.set_data(posicoes_x, posicoes_y)
+        return blocos + [molas]
 
-    anim = FuncAnimation(fig, update, frames=600, init_func=init, blit=True, interval=30)
+    animacao = FuncAnimation(
+        figura,
+        atualizar,
+        frames=600,
+        init_func=inicializar,
+        blit=True,
+        interval=30
+    )
+
     plt.show()
 
-
-# Chamar o simulador
-massa_mola_simulador()
+simulador_massa_mola()
