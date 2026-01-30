@@ -4,90 +4,95 @@ import random
 import math
 import time
 
-# Function to initialize particles
-def initialize_particles(num_particles):
-    particles = np.zeros(num_particles, dtype=[
+def inicializar_particulas(numero_particulas):
+    particulas = np.zeros(numero_particulas, dtype=[
         ('x', float), ('y', float),
         ('vx', float), ('vy', float),
-        ('mass', float), ('color', int)
+        ('massa', float), ('cor', int)
     ])
 
-    for particle in particles:
-        particle['x'] = random.uniform(1, 83)
-        particle['y'] = random.uniform(1, 59)
-        particle['vx'] = random.uniform(-1, 1) / 5
-        particle['vy'] = random.uniform(-1, 1) / 5
-        particle['mass'] = random.uniform(10, 20)
-        particle['color'] = random.randint(1, 15)
+    for particula in particulas:
+        particula['x'] = random.uniform(1, 83)
+        particula['y'] = random.uniform(1, 59)
+        particula['vx'] = random.uniform(-1, 1) / 5
+        particula['vy'] = random.uniform(-1, 1) / 5
+        particula['massa'] = random.uniform(10, 20)
+        particula['cor'] = random.randint(1, 15)
 
-    return particles
+    return particulas
 
-# Function to draw particles
-def draw_particles(stdscr, particles):
-    for particle in particles:
-        x, y = int(particle['x']), int(particle['y'])
-        radius = int(particle['mass'] // 10)
-        char = 'O' if radius < 2 else '0'
+def desenhar_particulas(tela, particulas):
+    for particula in particulas:
+        x, y = int(particula['x']), int(particula['y'])
+        raio = int(particula['massa'] // 10)
+        caractere = 'O' if raio < 2 else '0'
         try:
-            stdscr.addch(y, x, char, curses.color_pair(particle['color']))
+            tela.addch(y, x, caractere, curses.color_pair(particula['cor']))
         except curses.error:
             pass
 
-# Main simulation function
-def simulate(stdscr, num_particles):
+def simular(tela, numero_particulas):
     curses.curs_set(0)
-    stdscr.nodelay(1)
+    tela.nodelay(1)
 
-    particles = initialize_particles(num_particles)
-
-    delay = 0.05
+    particulas = inicializar_particulas(numero_particulas)
+    atraso = 0.05
 
     while True:
-        stdscr.clear()
+        tela.clear()
+        desenhar_particulas(tela, particulas)
+        tela.refresh()
 
-        draw_particles(stdscr, particles)
-        stdscr.refresh()
+        for particula in particulas:
+            particula['x'] += particula['vx']
+            particula['y'] += particula['vy']
 
-        for particle in particles:
-            particle['x'] += particle['vx']
-            particle['y'] += particle['vy']
+            if particula['x'] <= 1 and particula['vx'] < 0:
+                particula['vx'] = -particula['vx']
+            if particula['y'] <= 1 and particula['vy'] < 0:
+                particula['vy'] = -particula['vy']
+            if particula['x'] >= 83 and particula['vx'] > 0:
+                particula['vx'] = -particula['vx']
+            if particula['y'] >= 59 and particula['vy'] > 0:
+                particula['vy'] = -particula['vy']
 
-            # Boundary collision
-            if particle['x'] <= 1 and particle['vx'] < 0: particle['vx'] = -particle['vx']
-            if particle['y'] <= 1 and particle['vy'] < 0: particle['vy'] = -particle['vy']
-            if particle['x'] >= 83 and particle['vx'] > 0: particle['vx'] = -particle['vx']
-            if particle['y'] >= 59 and particle['vy'] > 0: particle['vy'] = -particle['vy']
+        for i in range(numero_particulas):
+            for j in range(i + 1, numero_particulas):
+                distancia = math.hypot(
+                    particulas[j]['x'] - particulas[i]['x'],
+                    particulas[j]['y'] - particulas[i]['y']
+                )
 
-        # Particle collisions
-        for i in range(num_particles):
-            for j in range(i + 1, num_particles):
-                dist = math.hypot(particles[j]['x'] - particles[i]['x'], particles[j]['y'] - particles[i]['y'])
-                if dist < 2:
-                    angle = math.atan2(particles[j]['y'] - particles[i]['y'], particles[j]['x'] - particles[i]['x'])
-                    speed1 = math.hypot(particles[i]['vx'], particles[i]['vy'])
-                    speed2 = math.hypot(particles[j]['vx'], particles[j]['vy'])
+                if distancia < 2:
+                    angulo = math.atan2(
+                        particulas[j]['y'] - particulas[i]['y'],
+                        particulas[j]['x'] - particulas[i]['x']
+                    )
 
-                    mass1 = particles[i]['mass']
-                    mass2 = particles[j]['mass']
+                    velocidade1 = math.hypot(particulas[i]['vx'], particulas[i]['vy'])
+                    velocidade2 = math.hypot(particulas[j]['vx'], particulas[j]['vy'])
 
-                    new_vx1 = (speed1 * math.cos(angle) * (mass1 - mass2) + 2 * mass2 * speed2 * math.cos(angle)) / (mass1 + mass2)
-                    new_vy1 = (speed1 * math.sin(angle) * (mass1 - mass2) + 2 * mass2 * speed2 * math.sin(angle)) / (mass1 + mass2)
-                    new_vx2 = (speed2 * math.cos(angle) * (mass2 - mass1) + 2 * mass1 * speed1 * math.cos(angle)) / (mass1 + mass2)
-                    new_vy2 = (speed2 * math.sin(angle) * (mass2 - mass1) + 2 * mass1 * speed1 * math.sin(angle)) / (mass1 + mass2)
+                    massa1 = particulas[i]['massa']
+                    massa2 = particulas[j]['massa']
 
-                    particles[i]['vx'] = new_vx1
-                    particles[i]['vy'] = new_vy1
-                    particles[j]['vx'] = new_vx2
-                    particles[j]['vy'] = new_vy2
+                    novo_vx1 = (velocidade1 * math.cos(angulo) * (massa1 - massa2) + 2 * massa2 * velocidade2 * math.cos(angulo)) / (massa1 + massa2)
+                    novo_vy1 = (velocidade1 * math.sin(angulo) * (massa1 - massa2) + 2 * massa2 * velocidade2 * math.sin(angulo)) / (massa1 + massa2)
+                    novo_vx2 = (velocidade2 * math.cos(angulo) * (massa2 - massa1) + 2 * massa1 * velocidade1 * math.cos(angulo)) / (massa1 + massa2)
+                    novo_vy2 = (velocidade2 * math.sin(angulo) * (massa2 - massa1) + 2 * massa1 * velocidade1 * math.sin(angulo)) / (massa1 + massa2)
 
-        time.sleep(delay)
-        if stdscr.getch() == ord(' '):
+                    particulas[i]['vx'] = novo_vx1
+                    particulas[i]['vy'] = novo_vy1
+                    particulas[j]['vx'] = novo_vx2
+                    particulas[j]['vy'] = novo_vy2
+
+        time.sleep(atraso)
+
+        if tela.getch() == ord(' '):
             break
 
-# Setup curses and start simulation
 def main():
-    num_particles = int(input("DIGITE O NUMERO DE PARTICULAS: "))
-    curses.wrapper(simulate, num_particles)
+    numero_particulas = int(input("DIGITE O NUMERO DE PARTICULAS: "))
+    curses.wrapper(simular, numero_particulas)
 
 if __name__ == "__main__":
     main()
