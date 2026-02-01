@@ -1,0 +1,23 @@
+services:
+  # 1. Simulação de Colisões
+  colisoes:
+    build: .
+    stdin_open: true
+    tty: true
+    command: python aps_colisoes/aps_colisoes.py
+
+  # 2. Sistema Massa-Mola 
+  massa-mola:
+    build: .
+    stdin_open: true
+    tty: true
+    command: python aps_massa_mola/aps_massa_mola.py
+
+  # 3. Análise do Pêndulo 
+  pendulo:
+    build: .
+    volumes:
+            - ./aps_pendulo/output:/app/aps_pendulo/output
+    command: >
+      sh -c "python aps_pendulo/process_video.py && 
+             python aps_pendulo/analyze_data.py"
